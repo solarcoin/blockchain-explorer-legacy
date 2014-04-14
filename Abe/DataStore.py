@@ -1067,11 +1067,28 @@ store._ddl['configvar'],
     chain_code3 CHAR(3)     NULL,
     chain_address_version BIT VARYING(800) NOT NULL,
     chain_last_block_id NUMERIC(14) NULL,
+    total_satoshis_coldstorage NUMERIC(30) NULL,
     FOREIGN KEY (magic_id)  REFERENCES magic (magic_id),
     FOREIGN KEY (policy_id) REFERENCES policy (policy_id),
     FOREIGN KEY (chain_last_block_id)
         REFERENCES block (block_id)
 )""",
+
+# COLD_STORAGE is a list of all cold storage wallet addresses
+# in base58 format. Values are updated manually via SQL any time
+# cold wallet funds are sent to a new address. This information
+# is for display purposes only.
+
+"""CREATE TABLE cold_storage (
+  cold_storage_id INT(11) NOT NULL PRIMARY KEY AUTO_INCREMENT,
+  base58_address VARCHAR(35) UNIQUE NOT NULL,
+  pubkey_id NUMERIC(26) NULL,
+  address_value NUMERIC(30) NULL,
+  address_active BINARY(1) DEFAULT '0'
+)""",
+
+
+
 
 # CHAIN_CANDIDATE lists blocks that are, or might become, part of the
 # given chain.  IN_LONGEST is 1 when the block is in the chain, else 0.
