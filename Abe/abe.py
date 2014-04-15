@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# url !/usr/bin/env python
 # Copyright(C) 2011,2012,2013 by Abe developers.
 
 # This program is free software: you can redistribute it and/or modify
@@ -31,6 +31,8 @@ import json
 import version
 import DataStore
 import readconf
+#from urllib2 import Request, urlopen
+import requests
 
 # bitcointools -- modified deserialize.py to return raw transaction
 import deserialize
@@ -304,8 +306,7 @@ class Abe:
                    b.block_total_seconds, b.block_total_satoshis,
                    b.block_satoshi_seconds,
                    b.block_total_ss, c.chain_id, c.chain_code3,
-                   c.chain_address_version, c.chain_last_block_id, 
-                   (b.block_total_satoshis - c.total_satoshis_coldstorage) as coins_circulating
+                   c.chain_address_version, c.chain_last_block_id
               FROM chain c
               JOIN block b ON (c.chain_last_block_id = b.block_id)
              ORDER BY c.chain_name
@@ -313,11 +314,13 @@ class Abe:
         for row in rows:
             name = row[0]
             chain = abe._row_to_chain((row[8], name, row[9], row[10], row[11]))
+	    chain_id = row[8]
             body += [
                 '<tr><td><a href="chain/', escape(name), '">',
                 escape(name), '</a></td><td>', escape(chain['code3']), '</td>']
 
             if row[1] is not None:
+
                 (height, nTime, hash) = (
                     int(row[1]), int(row[2]), abe.store.hashout_hex(row[3]))
 
@@ -326,8 +329,8 @@ class Abe:
                     '<td>', format_time(nTime), '</td>']
 
                 if row[6] is not None and row[7] is not None:
-                    (seconds, satoshis, ss, total_ss, circulating) = (
-                        int(row[4]), int(row[5]), int(row[6]), int(row[7]), int(row[12]))
+                    (seconds, satoshis, ss, total_ss) = (
+                        int(row[4]), int(row[5]), int(row[6]), int(row[7]))
 
                     started = nTime - seconds
                     chain_age = now - started
@@ -350,43 +353,68 @@ class Abe:
                             percent_destroyed = '%5g%%' % (
                                 100.0 - (100.0 * (ss + more) / denominator))
 
+        	    rows1 = abe.store.selectall("""
+           	       SELECT c.base58_address
+              	          FROM cold_storage c
+	                  WHERE is_active=1
+			  AND chain_id = ?
+	     	    """, (chain_id,))
+
+		    prevtotalcold=0
+		    for row in rows1:
+                    	address = row[0]
+ 	       	    	url = 'http://localhost/chain/SolarCoin/q/addressbalance/' + address
+			r = requests.get(url)
+			if 'ERROR' in r.text:
+				addrbal = ""
+			else:
+				addrbal = float(r.text)
+	       	        	totalcold = addrbal+prevtotalcold 
+	   	       		prevtotalcold = totalcold
+
                     body += [
                         '<td>', format_time(started)[:10], '</td>',
                         '<td>', '%5g' % (chain_age / 86400.0), '</td>',
                         '<td>', format_satoshis(satoshis, chain), '</td>',
-                        '<td>', format_satoshis(circulating, chain), '</td>',
-                        '<td>', avg_age, '</td>',
+                        '<td>', (float(format_satoshis(satoshis, chain)) - totalcold), '</td>',
+			'<td>', avg_age, '</td>',
                         '<td>', percent_destroyed, '</td>']
 
             body += ['</tr>\n']
-        body += ['</table>\n']
+        body += ['</table>\n']		
 	body += [
 		'<br><br><br>*Coins Circulating equals total SLR created minus SLR held in ',
 		'Genesis and Generator pool cold storage wallets. <br>Cold storage wallet addresses are ',
 		'provided in the table below for verification purposes.<br><br>',
 		'<table><tr><th>Cold Storage Wallet Address</th><th>SLR Balance</th></tr>\n']
 
-        rows1 = abe.store.selectall("""
-           SELECT c.base58_address, c.address_value
+        rows = abe.store.selectall("""
+           SELECT c.base58_address
               FROM cold_storage c
 	      WHERE is_active=1
-	    UNION SELECT "Total", SUM(c.address_value)
-	      FROM cold_storage c
-	      WHERE is_active=1
+	    UNION SELECT "Total"
+	      FROM dual
         """)
-
-	for row in rows1:
-            address = row[0]      
-	    if row[1] is not None:
-	       balance = int(row[1])
+	
+	prevtotal=0
+	for row in rows:
+            address = row[0]
             if address != "Total":
-               body += [
+ 	       url = 'http://localhost/chain/SolarCoin/q/addressbalance/' + address
+	       r = requests.get(url)
+	       if 'ERROR' in r.text:
+		  addrbal = "INVALID ADDRESS"
+	       else:
+	       	  addrbal = float(r.text)
+	          totalcold = addrbal+prevtotal
+		  prevtotal = totalcold
+	       body += [
   	          '<tr><td><a href="address/', address, '">', address, '</a></td>',               
-		  '<td>', format_satoshis(balance, chain), '</td>']
+		  '<td>', addrbal, '</td>']
  	    else:
                body += [
                   '<tr><td>', address, '</td>',
-                  '<td>', format_satoshis(balance, chain), '</td>']
+	          '<td>', totalcold, '</td>']
 
             body += ['</tr>\n']
         body += ['</table>\n']  
@@ -1878,13 +1906,27 @@ class Abe:
                 ' observed generations minus a calculated sum value for cold storage address balances.\n' \
                 '/chain/CHAIN/q/totalbccirc\n'
         height = path_info_uint(page, None) 
-        row = abe.store.selectrow("""
-           SELECT (b.block_total_satoshis - c.total_satoshis_coldstorage) as coins_circulating
-             FROM chain c
-             LEFT JOIN block b ON (c.chain_last_block_id = b.block_id)
-             WHERE c.chain_id = ?
-           """, (chain['id'],))
-        return format_satoshis(row[0], chain) if row else 0
+    	rows = abe.store.selectall("""
+           SELECT b.block_total_satoshis, cs.base58_address
+              FROM chain c
+              LEFT JOIN block b ON (c.chain_last_block_id = b.block_id)
+	      LEFT JOIN cold_storage cs ON (c.chain_id = cs.chain_id)	
+	      WHERE cs.is_active=1
+	      AND c.chain_id = ?
+	""", (chain['id'],))
+	prevtotalcold = 0
+	for row in rows:
+	   address = row[1] 
+     	   url = 'http://localhost/chain/SolarCoin/q/addressbalance/' + address
+	   r = requests.get(url)
+	   if 'ERROR' in r.text:
+	      addrbal = 0
+	   else:
+              addrbal = float(r.text)
+       	      totalcold = addrbal+prevtotalcold 
+	      prevtotalcold = totalcold
+        totalcirc = (float(format_satoshis(row[0], chain)) - totalcold)
+	return totalcirc if rows else 0
 
     def q_getreceivedbyaddress(abe, page, chain):
         """shows the amount ever received by a given address."""

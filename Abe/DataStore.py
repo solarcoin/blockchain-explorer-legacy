@@ -1067,7 +1067,6 @@ store._ddl['configvar'],
     chain_code3 CHAR(3)     NULL,
     chain_address_version BIT VARYING(800) NOT NULL,
     chain_last_block_id NUMERIC(14) NULL,
-    total_satoshis_coldstorage NUMERIC(30) NULL,
     FOREIGN KEY (magic_id)  REFERENCES magic (magic_id),
     FOREIGN KEY (policy_id) REFERENCES policy (policy_id),
     FOREIGN KEY (chain_last_block_id)
@@ -1081,10 +1080,11 @@ store._ddl['configvar'],
 
 """CREATE TABLE cold_storage (
   cold_storage_id INT(11) NOT NULL PRIMARY KEY AUTO_INCREMENT,
+  chain_id NUMERIC(10) NOT NULL,
   base58_address VARCHAR(35) UNIQUE NOT NULL,
   pubkey_id NUMERIC(26) NULL,
-  address_value NUMERIC(30) NULL,
-  is_active TINYINT(1) NULL DEFAULT 0
+  is_active TINYINT(1) NULL DEFAULT 0,
+  FOREIGN KEY (chain_id) REFERENCES chain (chain_id)
 )""",
 
 
