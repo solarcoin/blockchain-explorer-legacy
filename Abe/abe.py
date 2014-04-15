@@ -370,7 +370,7 @@ class Abe:
            SELECT c.base58_address, c.address_value
               FROM cold_storage c
 	      WHERE is_active=1
-	    UNION SELECT "Total", SUM(c.address_value) AS totalprice
+	    UNION SELECT "Total", SUM(c.address_value)
 	      FROM cold_storage c
 	      WHERE is_active=1
         """)
@@ -379,10 +379,14 @@ class Abe:
             address = row[0]      
 	    if row[1] is not None:
 	       balance = int(row[1])
-
-            body += [
-                '<tr><td>', address, '</td>',
-                '<td>', format_satoshis(balance, chain), '</td>']
+            if address != "Total":
+               body += [
+  	          '<tr><td><a href="address/', address, '">', address, '</a></td>',               
+		  '<td>', format_satoshis(balance, chain), '</td>']
+ 	    else:
+               body += [
+                  '<tr><td>', address, '</td>',
+                  '<td>', format_satoshis(balance, chain), '</td>']
 
             body += ['</tr>\n']
         body += ['</table>\n']  
@@ -1861,6 +1865,25 @@ class Abe:
             """, (chain['id'], height))
             if not row:
                 return 'ERROR: block %d not seen yet' % (height,)
+        return format_satoshis(row[0], chain) if row else 0
+
+    def q_totalbccirc(abe, page, chain):
+        """shows the amount of currency in circulation."""
+        if chain is None:
+            return 'Shows the amount of currency in circulation.\n' \
+                'This is calculated as total coins created minus total coins held ' \
+                'in cold storage. All cold storage wallet addresses are documented on the ' \
+		'ABE home page.  Any coins destroyed are not taken into account. \n' \
+                'This does not support future or previous block numbers, and it returns a sum of' \
+                ' observed generations minus a calculated sum value for cold storage address balances.\n' \
+                '/chain/CHAIN/q/totalbccirc\n'
+        height = path_info_uint(page, None) 
+        row = abe.store.selectrow("""
+           SELECT (b.block_total_satoshis - c.total_satoshis_coldstorage) as coins_circulating
+             FROM chain c
+             LEFT JOIN block b ON (c.chain_last_block_id = b.block_id)
+             WHERE c.chain_id = ?
+           """, (chain['id'],))
         return format_satoshis(row[0], chain) if row else 0
 
     def q_getreceivedbyaddress(abe, page, chain):
