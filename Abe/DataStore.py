@@ -1084,7 +1084,7 @@ store._ddl['configvar'],
   base58_address VARCHAR(35) UNIQUE NOT NULL,
   pubkey_id NUMERIC(26) NULL,
   address_value NUMERIC(30) NULL,
-  address_active BINARY(1) DEFAULT '0'
+  is_active TINYINT(1) NULL DEFAULT 0
 )""",
 
 

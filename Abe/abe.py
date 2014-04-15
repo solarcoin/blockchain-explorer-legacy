@@ -293,7 +293,7 @@ class Abe:
             '<table>\n',
             '<tr><th>Currency</th><th>Code</th><th>Block</th><th>Time</th>',
             '<th>Started</th><th>Age (days)</th><th>Coins Created</th>',
-            '<th>Avg Coin Age</th><th>',
+            '<th>Coins Circulating*</th><th>Avg Coin Age</th><th>',
             '% <a href="https://en.bitcoin.it/wiki/Bitcoin_Days_Destroyed">',
             'CoinDD</a></th>',
             '</tr>\n']
@@ -304,7 +304,8 @@ class Abe:
                    b.block_total_seconds, b.block_total_satoshis,
                    b.block_satoshi_seconds,
                    b.block_total_ss, c.chain_id, c.chain_code3,
-                   c.chain_address_version, c.chain_last_block_id
+                   c.chain_address_version, c.chain_last_block_id, 
+                   (b.block_total_satoshis - c.total_satoshis_coldstorage) as coins_circulating
               FROM chain c
               JOIN block b ON (c.chain_last_block_id = b.block_id)
              ORDER BY c.chain_name
@@ -325,8 +326,8 @@ class Abe:
                     '<td>', format_time(nTime), '</td>']
 
                 if row[6] is not None and row[7] is not None:
-                    (seconds, satoshis, ss, total_ss) = (
-                        int(row[4]), int(row[5]), int(row[6]), int(row[7]))
+                    (seconds, satoshis, ss, total_ss, circulating) = (
+                        int(row[4]), int(row[5]), int(row[6]), int(row[7]), int(row[12]))
 
                     started = nTime - seconds
                     chain_age = now - started
@@ -353,12 +354,38 @@ class Abe:
                         '<td>', format_time(started)[:10], '</td>',
                         '<td>', '%5g' % (chain_age / 86400.0), '</td>',
                         '<td>', format_satoshis(satoshis, chain), '</td>',
+                        '<td>', format_satoshis(circulating, chain), '</td>',
                         '<td>', avg_age, '</td>',
                         '<td>', percent_destroyed, '</td>']
 
             body += ['</tr>\n']
         body += ['</table>\n']
-        if len(rows) == 0:
+	body += [
+		'<br><br>* Coins Circulating equals total SLR created minus SLR held in ',
+		'Genesis and Generator Pool Cold Storage Wallets. Cold Wallet addresses are ',
+		'provided in the table below for verification purposes.<br><br>',	
+		'<table>\n',
+                   '<tr><th>Cold Storage Wallet Address/th><th>Balance</th>',
+            	   '</tr>\n']
+
+	rows1 = abe.store.selectall("""
+	   SELECT c.base58_address, c.address_value
+	      FROM cold_storage c
+ 	      WHERE is_active=1
+	      ORDER BY c.base58_address
+	""")
+	for row in rows1:
+            address = row[0]      
+		if row[1] is not None:
+                    balance = int(row[1])
+		else balance = 'N/A'
+            body += [
+                '<tr><td>', address, '</td>',
+                '<td>', format_satoshis(balance, chain), '</td>']
+            body += ['</tr>\n']
+        body += ['</table>\n']        
+
+	if len(rows) == 0:
             body += ['<p>No block data found.</p>\n']
 
     def _chain_fields(abe):
