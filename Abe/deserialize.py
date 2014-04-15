@@ -92,8 +92,8 @@ def parse_Transaction(vds):
   for i in xrange(n_vout):
     d['txOut'].append(parse_TxOut(vds))
   d['lockTime'] = vds.read_uint32()
-  if int(d['version']) > 1:
-    d['txComment'] = vds.read_string()
+  #REMOVED if int(d['version']) > 1:
+  d['txComment'] = vds.read_string()
   d['__data__'] = vds.input[start_pos:vds.read_cursor]
   return d
 
