@@ -361,29 +361,31 @@ class Abe:
             body += ['</tr>\n']
         body += ['</table>\n']
 	body += [
-		'<br><br>* Coins Circulating equals total SLR created minus SLR held in ',
-		'Genesis and Generator Pool Cold Storage Wallets. Cold Wallet addresses are ',
-		'provided in the table below for verification purposes.<br><br>',	
-		'<table>\n',
-                   '<tr><th>Cold Storage Wallet Address/th><th>Balance</th>',
-            	   '</tr>\n']
+		'<br><br><br>*Coins Circulating equals total SLR created minus SLR held in ',
+		'Genesis and Generator pool cold storage wallets. <br>Cold storage wallet addresses are ',
+		'provided in the table below for verification purposes.<br><br>',
+		'<table><tr><th>Cold Storage Wallet Address</th><th>SLR Balance</th></tr>\n']
 
-	rows1 = abe.store.selectall("""
-	   SELECT c.base58_address, c.address_value
+        rows1 = abe.store.selectall("""
+           SELECT c.base58_address, c.address_value
+              FROM cold_storage c
+	      WHERE is_active=1
+	    UNION SELECT "Total", SUM(c.address_value) AS totalprice
 	      FROM cold_storage c
- 	      WHERE is_active=1
-	      ORDER BY c.base58_address
-	""")
+	      WHERE is_active=1
+        """)
+
 	for row in rows1:
             address = row[0]      
-		if row[1] is not None:
-                    balance = int(row[1])
-		else balance = 'N/A'
+	    if row[1] is not None:
+	       balance = int(row[1])
+
             body += [
                 '<tr><td>', address, '</td>',
                 '<td>', format_satoshis(balance, chain), '</td>']
+
             body += ['</tr>\n']
-        body += ['</table>\n']        
+        body += ['</table>\n']  
 
 	if len(rows) == 0:
             body += ['<p>No block data found.</p>\n']
