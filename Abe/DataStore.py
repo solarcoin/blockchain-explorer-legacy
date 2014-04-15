@@ -2181,10 +2181,10 @@ store._ddl['txout_approx'],
             tx['size'] = len(tx['__data__'])
 
         store.sql("""
-            INSERT INTO tx (tx_id, tx_hash, tx_version, tx_lockTime, tx_size)
-            VALUES (?, ?, ?, ?, ?)""",
+            INSERT INTO tx (tx_id, tx_hash, tx_version, tx_lockTime, tx_size, tx_comment)
+            VALUES (?, ?, ?, ?, ?, ?)""",
                   (tx_id, dbhash, store.intin(tx['version']),
-                   store.intin(tx['lockTime']), tx['size']))
+                   store.intin(tx['lockTime']), tx['size'], tx['txComment']))
 
         # Import transaction outputs.
         tx['value_out'] = 0
