@@ -1,5 +1,5 @@
 ABE for SolarCoin has been modified to display a list of cold wallet addresses on the landing page. 
-The total amount of SLR in cold storage is deemed as "non-circulating" and should not be included 
+The total amount of coins in cold storage is deemed as "non-circulating" and should not be included 
 in market capitalization calculations. "Coins Circulating" is defined as total coins mined minus 
 coins held in cold storage wallets. 
 
