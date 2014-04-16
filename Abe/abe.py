@@ -835,7 +835,7 @@ class Abe:
             return
 
         row = abe.store.selectrow("""
-            SELECT tx_id, tx_version, tx_lockTime, tx_size
+            SELECT tx_id, tx_version, tx_lockTime, tx_size, tx_comment
               FROM tx
              WHERE tx_hash = ?
         """, (abe.store.hashin_hex(tx_hash),))
@@ -844,6 +844,7 @@ class Abe:
             return
         tx_id, tx_version, tx_lockTime, tx_size = (
             int(row[0]), int(row[1]), int(row[2]), int(row[3]))
+        tx_comment = str(row[4])
 
         block_rows = abe.store.selectall("""
             SELECT c.chain_name, cc.in_longest,
@@ -979,7 +980,9 @@ class Abe:
                                      (value_in and value_out and
                                       value_in - value_out), chain),
             '<br />\n',
-            '<a href="../rawtx/', tx_hash, '">Raw transaction</a><br />\n']
+            '<a href="../rawtx/', tx_hash, '">Raw transaction</a><br /><br />\n',
+	    '<u>Transaction Comment:</u><br />', tx_comment]
+
         body += ['</p>\n',
                  '<a name="inputs"><h3>Inputs</h3></a>\n<table>\n',
                  '<tr><th>Index</th><th>Previous output</th><th>Amount</th>',
