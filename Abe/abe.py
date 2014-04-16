@@ -695,14 +695,14 @@ class Abe:
         block_out = 0
         block_in = 0
         for row in abe.store.selectall("""
-            SELECT tx_id, tx_hash, tx_size, txout_value, pubkey_hash
+            SELECT tx_id, tx_hash, tx_size, txout_value, pubkey_hash, tx_comment
               FROM txout_detail
              WHERE block_id = ?
              ORDER BY tx_pos, txout_pos
         """, (block_id,)):
-            tx_id, tx_hash_hex, tx_size, txout_value, pubkey_hash = (
+            tx_id, tx_hash_hex, tx_size, txout_value, pubkey_hash, tx_comment= (
                 row[0], abe.store.hashout_hex(row[1]), int(row[2]),
-                int(row[3]), abe.store.binout(row[4]))
+                int(row[3]), abe.store.binout(row[4]), str(row[5]))
             tx = txs.get(tx_id)
             if tx is None:
                 tx_ids.append(tx_id)
@@ -755,7 +755,7 @@ class Abe:
 
         body += ['<table><tr><th>Transaction</th><th>Fee</th>'
                  '<th>Size (kB)</th><th>From (amount)</th><th>To (amount)</th>'
-                 '</tr>\n']
+                 '<th>Transaction Comment</th></tr>\n']
         for tx_id in tx_ids:
             tx = txs[tx_id]
             is_coinbase = (tx_id == tx_ids[0])
@@ -784,7 +784,7 @@ class Abe:
                 body += hash_to_address_link(
                     address_version, txout['pubkey_hash'], page['dotdot'])
                 body += [': ', format_satoshis(txout['value'], chain), '<br />']
-            body += ['</td></tr>\n']
+            body += ['</td><td>', tx_comment, '</td></tr>\n']
         body += '</table>\n'
 
     def handle_block(abe, page):
