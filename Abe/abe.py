@@ -353,71 +353,52 @@ class Abe:
                             percent_destroyed = '%5g%%' % (
                                 100.0 - (100.0 * (ss + more) / denominator))
 
-        	    rows1 = abe.store.selectall("""
-           	       SELECT c.base58_address
-              	          FROM cold_storage c
-	                  WHERE is_active=1
-			  AND chain_id = ?
-	     	    """, (chain_id,))
 
-		    prevtotalcold=0
-		    for row in rows1:
-                    	address = row[0]
- 	       	    	url = 'http://localhost/chain/SolarCoin/q/addressbalance/' + address
-			r = requests.get(url)
-			if 'ERROR' in r.text:
-				addrbal = ""
-			else:
-				addrbal = float(r.text)
-	       	        	totalcold = addrbal+prevtotalcold 
-	   	       		prevtotalcold = totalcold
+		    rows1 = abe.store.selectall("""
+		       SELECT cs.base58_address, cs.chain_id
+              	       FROM cold_storage cs
+              	       WHERE is_active=1
+		    """)
+
+   		    coldstoragetablebody = []
+	            prevtotal=0
+	            for row in rows1:
+            		address = row[0]
+		        chainid = row[1]
+            		if not util.possible_address(address):
+	                   addrbal= 'ERROR: Address invalid'
+            		else:
+	                   version, hash = util.decode_address(address)
+            		   addrbal = abe.store.get_balance(chainid, hash)
+		           totalcold = addrbal+prevtotal
+               		   prevtotal = totalcold
+			   addrbal = format_satoshis(addrbal, chain)
+
+	            	#capture the row detail for the cold storage wallet table
+			coldstoragetablebody += [
+        	       	   '<tr><td><a href="address/', address, '">', address, '</a></td>',
+               	           '<td>', addrbal, '</td>']
 
                     body += [
                         '<td>', format_time(started)[:10], '</td>',
                         '<td>', '%5g' % (chain_age / 86400.0), '</td>',
                         '<td>', format_satoshis(satoshis, chain), '</td>',
-                        '<td>', (float(format_satoshis(satoshis, chain)) - totalcold), '</td>',
+                        '<td>', format_satoshis(satoshis-totalcold, chain), '</td>',
 			'<td>', avg_age, '</td>',
                         '<td>', percent_destroyed, '</td>']
 
             body += ['</tr>\n']
         body += ['</table>\n']		
 	body += [
-		'<br><br><br>*Coins Circulating equals total SLR created minus SLR held in ',
-		'Genesis and Generator pool cold storage wallets. <br>Cold storage wallet addresses are ',
+		'<br><br><br>*Coins Circulating equals total coins created minus coins held in ',
+		'Genesis and Generator pool cold storage wallets. <br>  Cold storage wallet addresses are ',
 		'provided in the table below for verification purposes.<br><br>',
 		'<table><tr><th>Cold Storage Wallet Address</th><th>SLR Balance</th></tr>\n']
+        body += [coldstoragetablebody,
+           '<tr><td><b>Total Cold Storage Balance</b></td>',
+           '<td>', format_satoshis(totalcold, chain), '</td></tr>\n']
+        body += ['</table>\n']
 
-        rows = abe.store.selectall("""
-           SELECT c.base58_address
-              FROM cold_storage c
-	      WHERE is_active=1
-	    UNION SELECT "Total"
-	      FROM dual
-        """)
-	
-	prevtotal=0
-	for row in rows:
-            address = row[0]
-            if address != "Total":
- 	       url = 'http://localhost/chain/SolarCoin/q/addressbalance/' + address
-	       r = requests.get(url)
-	       if 'ERROR' in r.text:
-		  addrbal = "INVALID ADDRESS"
-	       else:
-	       	  addrbal = float(r.text)
-	          totalcold = addrbal+prevtotal
-		  prevtotal = totalcold
-	       body += [
-  	          '<tr><td><a href="address/', address, '">', address, '</a></td>',               
-		  '<td>', addrbal, '</td>']
- 	    else:
-               body += [
-                  '<tr><td>', address, '</td>',
-	          '<td>', totalcold, '</td>']
-
-            body += ['</tr>\n']
-        body += ['</table>\n']  
 
 	if len(rows) == 0:
             body += ['<p>No block data found.</p>\n']
@@ -1906,6 +1887,7 @@ class Abe:
                 ' observed generations minus a calculated sum value for cold storage address balances.\n' \
                 '/chain/CHAIN/q/totalbccirc\n'
         height = path_info_uint(page, None) 
+
     	rows = abe.store.selectall("""
            SELECT b.block_total_satoshis, cs.base58_address
               FROM chain c
@@ -1914,18 +1896,19 @@ class Abe:
 	      WHERE cs.is_active=1
 	      AND c.chain_id = ?
 	""", (chain['id'],))
-	prevtotalcold = 0
-	for row in rows:
-	   address = row[1] 
-     	   url = 'http://localhost/chain/SolarCoin/q/addressbalance/' + address
-	   r = requests.get(url)
-	   if 'ERROR' in r.text:
-	      addrbal = 0
-	   else:
-              addrbal = float(r.text)
-       	      totalcold = addrbal+prevtotalcold 
-	      prevtotalcold = totalcold
-        totalcirc = (float(format_satoshis(row[0], chain)) - totalcold)
+
+        prevtotal=0
+        for row in rows:
+	   address = row[1]
+	   if not util.possible_address(address):
+	      addrbal= 0
+           else:
+	      version, hash = util.decode_address(address)
+              addrbal = abe.store.get_balance(chain['id'], hash)
+	      totalcold = addrbal+prevtotal
+              prevtotal = totalcold
+
+        totalcirc = format_satoshis((row[0]-totalcold), chain)        
 	return totalcirc if rows else 0
 
     def q_getreceivedbyaddress(abe, page, chain):

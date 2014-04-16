@@ -1130,7 +1130,8 @@ store._ddl['configvar'],
     tx_hash       BIT(256)    UNIQUE NOT NULL,
     tx_version    NUMERIC(10),
     tx_lockTime   NUMERIC(10),
-    tx_size       NUMERIC(10)
+    tx_size       NUMERIC(10),
+    tx_comment	  VARCHAR(528) NULL
 )""",
 
 # Presence of transactions in blocks is many-to-many.
@@ -2198,10 +2199,10 @@ store._ddl['txout_approx'],
             tx['size'] = len(tx['__data__'])
 
         store.sql("""
-            INSERT INTO tx (tx_id, tx_hash, tx_version, tx_lockTime, tx_size)
+            INSERT INTO tx (tx_id, tx_hash, tx_version, tx_lockTime, tx_size, tx_comment)
             VALUES (?, ?, ?, ?, ?)""",
                   (tx_id, dbhash, store.intin(tx['version']),
-                   store.intin(tx['lockTime']), tx['size']))
+                   store.intin(tx['lockTime']), tx['size']), tx['txComment'])
 
         # Import transaction outputs.
         tx['value_out'] = 0
