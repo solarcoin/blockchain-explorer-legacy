@@ -94,6 +94,10 @@ def parse_Transaction(vds):
   d['lockTime'] = vds.read_uint32()
   if int(d['version']) > 1:
     d['txComment'] = vds.read_string()
+  
+#default comment of an empty string on older versions
+  else: 
+    d['txComment'] = ""
   d['__data__'] = vds.input[start_pos:vds.read_cursor]
   return d
 
