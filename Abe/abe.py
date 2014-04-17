@@ -1025,6 +1025,47 @@ class Abe:
             return 'ERROR: Transaction does not exist.'  # BBE compatible
         return json.dumps(tx, sort_keys=True, indent=2)
 
+    def handle_messages(abe, page):
+        reclimit = wsgiref.util.shift_path_info(page['env'])
+
+#       if reclimit in (None, '','all') or page['env']['PATH_INFO'] != '':
+#          reclimit = 1000000000
+#	elif reclimit == 'recent':
+        reclimit = 150
+
+        page['title'] = 'Transaction Messages'
+	body = page['body']
+
+        txrows = abe.store.selectall("""
+            SELECT tx.tx_comment, b.block_height, tx.tx_hash, b.block_hash
+              FROM tx
+	      LEFT JOIN block_tx bt ON (bt.tx_id = tx.tx_id)
+	      LEFT JOIN block b ON (b.block_id = bt.block_id)
+	      WHERE length(tx.tx_comment) >1
+	      ORDER BY b.block_height desc
+	      LIMIT ?""",
+	      (reclimit,))
+
+	if txrows is None:
+	   body += ['<p class="error">No transaction messages found.</p>']
+           return
+	else:
+	   body += [
+              '<br /><br /><table><tr><th>Block</th><th>Transaction</th><th>Comment</th></tr>\n']
+#marker
+	   for row in txrows:
+	      if row[0] is not None:
+		 (txcomment, height, txhash, blockhash) = (
+		    str(row[0]), int(row[1]), abe.store.hashout_hex(row[2]), abe.store.hashout_hex(row[3]))
+
+	      body += [
+                 '<tr><td><a href="', page['dotdot'], 'block/', blockhash, '">', height, '</a></td>',
+		 '<td><a href="', page['dotdot'], 'tx/', txhash, '">', txhash[:10], '...</a></td>',                 
+		 '<td style="max-width: 600px;word-wrap:break-word;">', txcomment, '</td></tr>']
+
+	   body += ['</table>\n<br /><br />']
+
+
     def handle_address(abe, page):
         address = wsgiref.util.shift_path_info(page['env'])
         if address in (None, '') or page['env']['PATH_INFO'] != '':
