@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# url !/usr/bin/env python
 # Copyright(C) 2011,2012,2013 by Abe developers.
 
 # This program is free software: you can redistribute it and/or modify
@@ -31,6 +31,8 @@ import json
 import version
 import DataStore
 import readconf
+#from urllib2 import Request, urlopen
+import requests
 
 # bitcointools -- modified deserialize.py to return raw transaction
 import deserialize
@@ -67,7 +69,7 @@ DEFAULT_TEMPLATE = """
     <link rel="shortcut icon" href="%(dotdot)s%(STATIC_PATH)sfavicon.ico" />
     <title>%(title)s</title>
 </head>
-<body>
+<body style="font-family:Arial;font-size:0.9em;">
     <h1><a href="%(dotdot)s%(HOMEPAGE)s"><img
      src="%(dotdot)s%(STATIC_PATH)slogo32.png" alt="Abe logo" /></a> %(h1)s
     </h1>
@@ -293,7 +295,7 @@ class Abe:
             '<table>\n',
             '<tr><th>Currency</th><th>Code</th><th>Block</th><th>Time</th>',
             '<th>Started</th><th>Age (days)</th><th>Coins Created</th>',
-            '<th>Avg Coin Age</th><th>',
+            '<th>Coins Circulating*</th><th>Avg Coin Age</th><th>',
             '% <a href="https://en.bitcoin.it/wiki/Bitcoin_Days_Destroyed">',
             'CoinDD</a></th>',
             '</tr>\n']
@@ -312,11 +314,13 @@ class Abe:
         for row in rows:
             name = row[0]
             chain = abe._row_to_chain((row[8], name, row[9], row[10], row[11]))
+	    chain_id = row[8]
             body += [
                 '<tr><td><a href="chain/', escape(name), '">',
                 escape(name), '</a></td><td>', escape(chain['code3']), '</td>']
 
             if row[1] is not None:
+
                 (height, nTime, hash) = (
                     int(row[1]), int(row[2]), abe.store.hashout_hex(row[3]))
 
@@ -349,16 +353,58 @@ class Abe:
                             percent_destroyed = '%5g%%' % (
                                 100.0 - (100.0 * (ss + more) / denominator))
 
+		    totalcold = 0
+		    coldstoragetablebody = []
+		    rows1 = abe.store.selectall("""
+		       SELECT cs.base58_address, cs.chain_id
+              	       FROM cold_storage cs
+              	       WHERE is_active=1
+		    """)
+	            prevtotal=0
+	            for row in rows1:
+            		address = row[0]
+		        chainid = row[1]
+            		if not util.possible_address(address):
+	                   addrbal= 'ERROR: Address invalid'
+            		else:
+	                   version, hash = util.decode_address(address)
+            		   addrbal = abe.store.get_balance(chainid, hash)
+		           totalcold = addrbal+prevtotal
+               		   prevtotal = totalcold
+			   addrbal = format_satoshis(addrbal, chain)
+
+	            	#capture the row detail for the cold storage wallet table
+			coldstoragetablebody += [
+        	       	   '<tr><td><a href="address/', address, '">', address, '</a></td>',
+               	           '<td>', addrbal, '</td>']
+
                     body += [
                         '<td>', format_time(started)[:10], '</td>',
                         '<td>', '%5g' % (chain_age / 86400.0), '</td>',
                         '<td>', format_satoshis(satoshis, chain), '</td>',
-                        '<td>', avg_age, '</td>',
+                        '<td>', format_satoshis(satoshis-totalcold, chain), '</td>',
+			'<td>', avg_age, '</td>',
                         '<td>', percent_destroyed, '</td>']
 
             body += ['</tr>\n']
-        body += ['</table>\n']
-        if len(rows) == 0:
+        body += ['</table>\n']		
+	body += [
+		'<a style="font-size:80%">&nbsp; *Coins Circulating =  (total coins created) - (coins held in ',
+		'cold storage wallets). Cold storage wallet addresses are manually maintained in the ABE database. ',
+		'If any are found, they will be displayed in a table below.</a><br><br><br>\n']
+
+        if coldstoragetablebody:
+	   body += [
+	      '<table><tr><th>Cold Storage Wallet Address</th><th>SLR Balance</th></tr>\n']
+
+	   totalcoldresult = format_satoshis(totalcold, chain)
+	   body += [coldstoragetablebody,
+              '<tr><td><b>Total Cold Storage Balance</b></td>',
+              '<td>', totalcoldresult, '</td></tr>\n']
+           body += ['</table>\n<br /><br />',
+	      '<a href="/messages">View Recent Transaction Messages</a><br /><br />']
+
+	if len(rows) == 0:
             body += ['<p>No block data found.</p>\n']
 
     def _chain_fields(abe):
@@ -653,14 +699,14 @@ class Abe:
         block_out = 0
         block_in = 0
         for row in abe.store.selectall("""
-            SELECT tx_id, tx_hash, tx_size, txout_value, pubkey_hash
+            SELECT tx_id, tx_hash, tx_size, txout_value, pubkey_hash, tx_comment
               FROM txout_detail
              WHERE block_id = ?
              ORDER BY tx_pos, txout_pos
         """, (block_id,)):
-            tx_id, tx_hash_hex, tx_size, txout_value, pubkey_hash = (
+            tx_id, tx_hash_hex, tx_size, txout_value, pubkey_hash, tx_comment= (
                 row[0], abe.store.hashout_hex(row[1]), int(row[2]),
-                int(row[3]), abe.store.binout(row[4]))
+                int(row[3]), abe.store.binout(row[4]), str(row[5]))
             tx = txs.get(tx_id)
             if tx is None:
                 tx_ids.append(tx_id)
@@ -671,6 +717,7 @@ class Abe:
                     "out": [],
                     "in": [],
                     "size": tx_size,
+		    "txComment": tx_comment,
                     }
                 tx = txs[tx_id]
             tx['total_out'] += txout_value
@@ -713,7 +760,7 @@ class Abe:
 
         body += ['<table><tr><th>Transaction</th><th>Fee</th>'
                  '<th>Size (kB)</th><th>From (amount)</th><th>To (amount)</th>'
-                 '</tr>\n']
+                 '<th>Transaction Comment</th></tr>\n']
         for tx_id in tx_ids:
             tx = txs[tx_id]
             is_coinbase = (tx_id == tx_ids[0])
@@ -742,7 +789,7 @@ class Abe:
                 body += hash_to_address_link(
                     address_version, txout['pubkey_hash'], page['dotdot'])
                 body += [': ', format_satoshis(txout['value'], chain), '<br />']
-            body += ['</td></tr>\n']
+            body += ['</td><td style="max-width: 400px;word-wrap:break-word;">', tx['txComment'], '</td></tr>\n']
         body += '</table>\n'
 
     def handle_block(abe, page):
@@ -793,7 +840,7 @@ class Abe:
             return
 
         row = abe.store.selectrow("""
-            SELECT tx_id, tx_version, tx_lockTime, tx_size
+            SELECT tx_id, tx_version, tx_lockTime, tx_size, tx_comment
               FROM tx
              WHERE tx_hash = ?
         """, (abe.store.hashin_hex(tx_hash),))
@@ -802,6 +849,7 @@ class Abe:
             return
         tx_id, tx_version, tx_lockTime, tx_size = (
             int(row[0]), int(row[1]), int(row[2]), int(row[3]))
+        tx_comment = str(row[4])
 
         block_rows = abe.store.selectall("""
             SELECT c.chain_name, cc.in_longest,
@@ -937,7 +985,13 @@ class Abe:
                                      (value_in and value_out and
                                       value_in - value_out), chain),
             '<br />\n',
-            '<a href="../rawtx/', tx_hash, '">Raw transaction</a><br />\n']
+            '<a href="../rawtx/', tx_hash, '">Raw transaction</a><br /><br />\n',
+	    '<table style="margin: 0px;padding: 0px;"><tr style="margin: 0px;padding: 0px;">',
+	    '<td style="border-width: 0px;margin: 0px;padding: 0px;"><u>Transaction Comment</u></td></tr>\n',
+	    '<tr style="margin: 0px;padding: 0px;">',
+	    '<td style="max-width: 900px;word-wrap:break-word;border-width: 0px;margin: 0px;padding: 0px;">', 
+	    tx_comment, '</td></tr></table><br />\n']
+
         body += ['</p>\n',
                  '<a name="inputs"><h3>Inputs</h3></a>\n<table>\n',
                  '<tr><th>Index</th><th>Previous output</th><th>Amount</th>',
@@ -970,6 +1024,47 @@ class Abe:
         if tx is None:
             return 'ERROR: Transaction does not exist.'  # BBE compatible
         return json.dumps(tx, sort_keys=True, indent=2)
+
+    def handle_messages(abe, page):
+        reclimit = wsgiref.util.shift_path_info(page['env'])
+
+#       if reclimit in (None, '','all') or page['env']['PATH_INFO'] != '':
+#          reclimit = 1000000000
+#	elif reclimit == 'recent':
+        reclimit = 150
+
+        page['title'] = 'Transaction Messages'
+	body = page['body']
+
+        txrows = abe.store.selectall("""
+            SELECT tx.tx_comment, b.block_height, tx.tx_hash, b.block_hash
+              FROM tx
+	      LEFT JOIN block_tx bt ON (bt.tx_id = tx.tx_id)
+	      LEFT JOIN block b ON (b.block_id = bt.block_id)
+	      WHERE length(tx.tx_comment) >1
+	      ORDER BY b.block_height desc
+	      LIMIT ?""",
+	      (reclimit,))
+
+	if txrows is None:
+	   body += ['<p class="error">No transaction messages found.</p>']
+           return
+	else:
+	   body += [
+              '<br /><br /><table><tr><th>Block</th><th>Transaction</th><th>Comment</th></tr>\n']
+
+	   for row in txrows:
+	      if row[0] is not None:
+		 (txcomment, height, txhash, blockhash) = (
+		    str(row[0]), int(row[1]), abe.store.hashout_hex(row[2]), abe.store.hashout_hex(row[3]))
+
+	      body += [
+                 '<tr><td><a href="', page['dotdot'], 'block/', blockhash, '">', height, '</a></td>',
+		 '<td><a href="', page['dotdot'], 'tx/', txhash, '">', txhash[:10], '...</a></td>',                 
+		 '<td style="max-width: 600px;word-wrap:break-word;">', txcomment, '</td></tr>']
+
+	   body += ['</table>\n<br /><br />']
+
 
     def handle_address(abe, page):
         address = wsgiref.util.shift_path_info(page['env'])
@@ -1181,6 +1276,7 @@ class Abe:
         elif ADDR_PREFIX_RE.match(q):found += abe.search_address_prefix(q)
         if is_hash_prefix(q):       found += abe.search_hash_prefix(q)
         found += abe.search_general(q)
+#	found += abe.search_txcomment(q)
         abe.show_search_results(page, found)
 
     def show_search_results(abe, page, found):
@@ -1348,6 +1444,20 @@ class Abe:
                 OR UPPER(chain_code3) LIKE '%' || ? || '%'
         """, (q.upper(), q.upper())))
         return ret
+
+    def search_txcomment(abe, q):
+        """Search for transactions by transaction comments. Search is not case sensitive."""
+        def process(row):
+            (transhash, txid) = row
+            return { 'name': 'Transaction  ' + str(transhash),
+                     'uri': 'tx/' + str(transhash) }
+        ret = map(process, abe.store.selectall("""
+            SELECT tx_hash, tx_id
+              FROM tx
+             WHERE UPPER(tx_comment) LIKE '%' || ? || '%'
+        """, (q.upper())))
+        return ret
+
 
     def handle_t(abe, page):
         abe.show_search_results(
@@ -1833,6 +1943,45 @@ class Abe:
             if not row:
                 return 'ERROR: block %d not seen yet' % (height,)
         return format_satoshis(row[0], chain) if row else 0
+
+    def q_totalbccirc(abe, page, chain):
+        """shows the amount of currency in circulation."""
+        if chain is None:
+            return 'Shows the amount of currency in circulation.\n' \
+                'This is calculated as total coins created minus total coins held ' \
+                'in cold storage. All cold storage wallet addresses are documented on the ' \
+		'ABE home page.  Any coins destroyed are not taken into account. \n' \
+                'This does not support future or previous block numbers, and it returns a sum of' \
+                ' observed generations minus a calculated sum value for cold storage address balances.\n' \
+                '/chain/CHAIN/q/totalbccirc\n'
+        height = path_info_uint(page, None) 
+
+    	rows = abe.store.selectall("""
+	   SELECT b.block_total_satoshis, cs.base58_address
+              FROM chain c
+              LEFT JOIN block b ON (c.chain_last_block_id = b.block_id)
+              LEFT JOIN cold_storage cs ON (c.chain_id = cs.chain_id and cs.is_active=1)
+	      WHERE c.chain_id = ?
+	""", (chain['id'],))
+
+	totalmined = 0
+        totalcold = 0
+	prevtotal= 0
+        for row in rows:
+	   totalmined = row[0]
+	   if row[1]:
+	      address = row[1]
+	   else:
+	      address = "NoAddressFound"
+	   if not util.possible_address(address):
+	      addrbal= 0
+           else:
+	      version, hash = util.decode_address(address)
+              addrbal = abe.store.get_balance(chain['id'], hash)
+	      totalcold = addrbal+prevtotal
+              prevtotal = totalcold
+
+	return format_satoshis((totalmined-totalcold), chain) if rows else 0
 
     def q_getreceivedbyaddress(abe, page, chain):
         """shows the amount ever received by a given address."""

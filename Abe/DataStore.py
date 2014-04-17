@@ -922,6 +922,7 @@ LEFT JOIN block prev ON (b.prev_block_id = prev.block_id)""",
     tx.tx_lockTime,
     tx.tx_version,
     tx.tx_size,
+    tx.tx_comment,
     txout.txout_id,
     txout.txout_pos,
     txout.txout_value,
@@ -1074,6 +1075,23 @@ store._ddl['configvar'],
         REFERENCES block (block_id)
 )""",
 
+# COLD_STORAGE is a list of all cold storage wallet addresses
+# in base58 format. Values are updated manually via SQL any time
+# cold wallet funds are sent to a new address. This information
+# is for display purposes only.
+
+"""CREATE TABLE cold_storage (
+  cold_storage_id INT(11) NOT NULL PRIMARY KEY AUTO_INCREMENT,
+  chain_id NUMERIC(10) NOT NULL,
+  base58_address VARCHAR(35) UNIQUE NOT NULL,
+  pubkey_id NUMERIC(26) NULL,
+  is_active TINYINT(1) NULL DEFAULT 0,
+  FOREIGN KEY (chain_id) REFERENCES chain (chain_id)
+)""",
+
+
+
+
 # CHAIN_CANDIDATE lists blocks that are, or might become, part of the
 # given chain.  IN_LONGEST is 1 when the block is in the chain, else 0.
 # IN_LONGEST denormalizes information stored canonically in
@@ -1115,7 +1133,7 @@ store._ddl['configvar'],
     tx_version    NUMERIC(10),
     tx_lockTime   NUMERIC(10),
     tx_size       NUMERIC(10),
-    tx_comment    VARCHAR(528)
+    tx_comment	  VARCHAR(528) NULL
 )""",
 
 # Presence of transactions in blocks is many-to-many.
@@ -2293,7 +2311,7 @@ store._ddl['txout_approx'],
 
         if tx_id is not None:
             row = store.selectrow("""
-                SELECT tx_hash, tx_version, tx_lockTime, tx_size
+                SELECT tx_hash, tx_version, tx_lockTime, tx_size, tx_comment
                   FROM tx
                  WHERE tx_id = ?
             """, (tx_id,))
@@ -2303,7 +2321,7 @@ store._ddl['txout_approx'],
 
         elif tx_hash is not None:
             row = store.selectrow("""
-                SELECT tx_id, tx_version, tx_lockTime, tx_size
+                SELECT tx_id, tx_version, tx_lockTime, tx_size, tx_comment
                   FROM tx
                  WHERE tx_hash = ?
             """, (store.hashin_hex(tx_hash),))
@@ -2318,6 +2336,7 @@ store._ddl['txout_approx'],
         tx['version' if is_bin else 'ver']        = int(row[1])
         tx['lockTime' if is_bin else 'lock_time'] = int(row[2])
         tx['size'] = int(row[3])
+	tx['tx-comment'] = str(row[4])
 
         txins = []
         tx['txIn' if is_bin else 'in'] = txins
