@@ -401,8 +401,8 @@ class Abe:
 	   body += [coldstoragetablebody,
               '<tr><td><b>Total Cold Storage Balance</b></td>',
               '<td>', totalcoldresult, '</td></tr>\n']
-           body += ['</table>\n']
-
+           body += ['</table>\n<br /><br />',
+	      '<a href="/messages">View Recent Transaction Messages</a><br /><br />']
 
 	if len(rows) == 0:
             body += ['<p>No block data found.</p>\n']
@@ -1052,7 +1052,7 @@ class Abe:
 	else:
 	   body += [
               '<br /><br /><table><tr><th>Block</th><th>Transaction</th><th>Comment</th></tr>\n']
-#marker
+
 	   for row in txrows:
 	      if row[0] is not None:
 		 (txcomment, height, txhash, blockhash) = (
