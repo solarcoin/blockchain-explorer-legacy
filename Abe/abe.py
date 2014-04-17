@@ -69,7 +69,7 @@ DEFAULT_TEMPLATE = """
     <link rel="shortcut icon" href="%(dotdot)s%(STATIC_PATH)sfavicon.ico" />
     <title>%(title)s</title>
 </head>
-<body>
+<body style="font-family:Arial;font-size:0.9em;">
     <h1><a href="%(dotdot)s%(HOMEPAGE)s"><img
      src="%(dotdot)s%(STATIC_PATH)slogo32.png" alt="Abe logo" /></a> %(h1)s
     </h1>
@@ -353,14 +353,13 @@ class Abe:
                             percent_destroyed = '%5g%%' % (
                                 100.0 - (100.0 * (ss + more) / denominator))
 
-
+		    totalcold = 0
+		    coldstoragetablebody = []
 		    rows1 = abe.store.selectall("""
 		       SELECT cs.base58_address, cs.chain_id
               	       FROM cold_storage cs
               	       WHERE is_active=1
 		    """)
-
-   		    coldstoragetablebody = []
 	            prevtotal=0
 	            for row in rows1:
             		address = row[0]
@@ -390,14 +389,19 @@ class Abe:
             body += ['</tr>\n']
         body += ['</table>\n']		
 	body += [
-		'<br><br><br>*Coins Circulating equals total coins created minus coins held in ',
-		'Genesis and Generator pool cold storage wallets. <br>  Cold storage wallet addresses are ',
-		'provided in the table below for verification purposes.<br><br>',
-		'<table><tr><th>Cold Storage Wallet Address</th><th>SLR Balance</th></tr>\n']
-        body += [coldstoragetablebody,
-           '<tr><td><b>Total Cold Storage Balance</b></td>',
-           '<td>', format_satoshis(totalcold, chain), '</td></tr>\n']
-        body += ['</table>\n']
+		'<a style="font-size:80%">&nbsp; *Coins Circulating =  (total coins created) - (coins held in ',
+		'cold storage wallets). Cold storage wallet addresses are manually maintained in the ABE database. ',
+		'If any are found, they will be displayed in a table below.</a><br><br><br>\n']
+
+        if coldstoragetablebody:
+	   body += [
+	      '<table><tr><th>Cold Storage Wallet Address</th><th>SLR Balance</th></tr>\n']
+
+	   totalcoldresult = format_satoshis(totalcold, chain)
+	   body += [coldstoragetablebody,
+              '<tr><td><b>Total Cold Storage Balance</b></td>',
+              '<td>', totalcoldresult, '</td></tr>\n']
+           body += ['</table>\n']
 
 
 	if len(rows) == 0:
@@ -713,6 +717,7 @@ class Abe:
                     "out": [],
                     "in": [],
                     "size": tx_size,
+		    "txComment": tx_comment,
                     }
                 tx = txs[tx_id]
             tx['total_out'] += txout_value
@@ -784,7 +789,7 @@ class Abe:
                 body += hash_to_address_link(
                     address_version, txout['pubkey_hash'], page['dotdot'])
                 body += [': ', format_satoshis(txout['value'], chain), '<br />']
-            body += ['</td><td>', tx_comment, '</td></tr>\n']
+            body += ['</td><td style="max-width: 400px;word-wrap:break-word;">', tx['txComment'], '</td></tr>\n']
         body += '</table>\n'
 
     def handle_block(abe, page):
@@ -981,7 +986,11 @@ class Abe:
                                       value_in - value_out), chain),
             '<br />\n',
             '<a href="../rawtx/', tx_hash, '">Raw transaction</a><br /><br />\n',
-	    '<u>Transaction Comment:</u><br />', tx_comment]
+	    '<table style="margin: 0px;padding: 0px;"><tr style="margin: 0px;padding: 0px;">',
+	    '<td style="border-width: 0px;margin: 0px;padding: 0px;"><u>Transaction Comment</u></td></tr>\n',
+	    '<tr style="margin: 0px;padding: 0px;">',
+	    '<td style="max-width: 900px;word-wrap:break-word;border-width: 0px;margin: 0px;padding: 0px;">', 
+	    tx_comment, '</td></tr></table><br />\n']
 
         body += ['</p>\n',
                  '<a name="inputs"><h3>Inputs</h3></a>\n<table>\n',
@@ -1226,6 +1235,7 @@ class Abe:
         elif ADDR_PREFIX_RE.match(q):found += abe.search_address_prefix(q)
         if is_hash_prefix(q):       found += abe.search_hash_prefix(q)
         found += abe.search_general(q)
+#	found += abe.search_txcomment(q)
         abe.show_search_results(page, found)
 
     def show_search_results(abe, page, found):
@@ -1393,6 +1403,20 @@ class Abe:
                 OR UPPER(chain_code3) LIKE '%' || ? || '%'
         """, (q.upper(), q.upper())))
         return ret
+
+    def search_txcomment(abe, q):
+        """Search for transactions by transaction comments. Search is not case sensitive."""
+        def process(row):
+            (transhash, txid) = row
+            return { 'name': 'Transaction  ' + str(transhash),
+                     'uri': 'tx/' + str(transhash) }
+        ret = map(process, abe.store.selectall("""
+            SELECT tx_hash, tx_id
+              FROM tx
+             WHERE UPPER(tx_comment) LIKE '%' || ? || '%'
+        """, (q.upper())))
+        return ret
+
 
     def handle_t(abe, page):
         abe.show_search_results(
@@ -1892,17 +1916,22 @@ class Abe:
         height = path_info_uint(page, None) 
 
     	rows = abe.store.selectall("""
-           SELECT b.block_total_satoshis, cs.base58_address
+	   SELECT b.block_total_satoshis, cs.base58_address
               FROM chain c
               LEFT JOIN block b ON (c.chain_last_block_id = b.block_id)
-	      LEFT JOIN cold_storage cs ON (c.chain_id = cs.chain_id)	
-	      WHERE cs.is_active=1
-	      AND c.chain_id = ?
+              LEFT JOIN cold_storage cs ON (c.chain_id = cs.chain_id and cs.is_active=1)
+	      WHERE c.chain_id = ?
 	""", (chain['id'],))
 
-        prevtotal=0
+	totalmined = 0
+        totalcold = 0
+	prevtotal= 0
         for row in rows:
-	   address = row[1]
+	   totalmined = row[0]
+	   if row[1]:
+	      address = row[1]
+	   else:
+	      address = "NoAddressFound"
 	   if not util.possible_address(address):
 	      addrbal= 0
            else:
@@ -1911,8 +1940,7 @@ class Abe:
 	      totalcold = addrbal+prevtotal
               prevtotal = totalcold
 
-        totalcirc = format_satoshis((row[0]-totalcold), chain)        
-	return totalcirc if rows else 0
+	return format_satoshis((totalmined-totalcold), chain) if rows else 0
 
     def q_getreceivedbyaddress(abe, page, chain):
         """shows the amount ever received by a given address."""
