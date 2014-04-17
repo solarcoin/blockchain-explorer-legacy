@@ -1,3 +1,14 @@
+New in 0.8.1 - 2014-04-17
+=========================
+
+* Added "Coins Circulating" to landing page and new API.
+
+* Added table of cold wallet addresses & balances to landing page.
+
+* Added tx_comment to block, transactions, and rawtx page.
+
+
+
 New in 0.8 - ????
 =========================
 
