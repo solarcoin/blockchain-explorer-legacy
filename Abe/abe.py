@@ -27,6 +27,7 @@ import calendar
 import math
 import logging
 import json
+import view_templates
 
 import version
 import DataStore
@@ -313,7 +314,7 @@ class Abe:
 
     def handle_chains(abe, page):
         #page['title'] = ABE_APPNAME + ' Search'
-	body = page['body']
+	    body = page['body']
         body += [
             abe.search_form(page)]
             
@@ -332,7 +333,7 @@ class Abe:
         for row in rows:
             name = row[0]
             chain = abe._row_to_chain((row[8], name, row[9], row[10], row[11]))
-	    chain_id = row[8]
+	        chain_id = row[8]
  
             if row[1] is not None:
 
