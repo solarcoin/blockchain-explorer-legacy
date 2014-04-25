@@ -315,8 +315,13 @@ class Abe:
         #page['title'] = ABE_APPNAME + ' Search'
 	body = page['body']
         body += [
-            abe.search_form(page)]
-            
+            abe.search_form(page),
+            '<div class=\"row\">'
+            '  <div class=\"col-xs-4\">Total Blocks</div>'
+            '  <div class=\"col-xs-4\">Coins in Circulation</div>'
+            '  <div class=\"col-xs-4\">Total Coins Created</div>'
+            '</div>'
+
         now = time.time() - EPOCH1970
 
         rows = abe.store.selectall("""
@@ -333,11 +338,18 @@ class Abe:
             name = row[0]
             chain = abe._row_to_chain((row[8], name, row[9], row[10], row[11]))
 	    chain_id = row[8]
- 
+            body += [
+                '<tr><td><a href="chain/', escape(name), '">',
+                escape(name), '</a></td><td>', escape(chain['code3']), '</td>']
+
             if row[1] is not None:
 
                 (height, nTime, hash) = (
                     int(row[1]), int(row[2]), abe.store.hashout_hex(row[3]))
+
+                body += [
+                    '<td><a href="block/', hash, '">', height, '</a></td>',
+                    '<td>', format_time(nTime), '</td>']
 
                 if row[6] is not None and row[7] is not None:
                     (seconds, satoshis, ss, total_ss) = (
@@ -389,31 +401,21 @@ class Abe:
         	       	   '<tr><td><a href="address/', address, '">', address, '</a></td>',
                	           '<td>', addrbal, '</td>']
 
+                    body += [
+                        '<div class=\"row\">'
+                        '  <div class=\"col-xs-4\">', Total Blocks</div>'
+                        '  <div class=\"col-xs-4\">Coins in Circulation</div>'
+                        '  <div class=\"col-xs-4\">Total Coins Created</div>'
+                        '</div>'
+                        
+                        '<td>', format_time(started)[:10], '</td>',
+                        '<td>', '%5g' % (chain_age / 86400.0), '</td>',
+                        '<td>', format_satoshis(satoshis, chain), '</td>',
+                        '<td>', format_satoshis(satoshis-totalcold, chain), '</td>',
+			'<td>', avg_age, '</td>',
+                        '<td>', percent_destroyed, '</td>']
 
-            body += [
-            '<div class="row">'
-            '  <div class="col-xs-4">'
-            '    <div class="panel panel-default">'
-            '       <div class="panel-heading"><h4>Total Blocks</h4></div>'
-            '       <div class="panel-body">', height, '</div>'
-            '    </div>'
-            '   </div>'
-
-            '  <div class="col-xs-4">'
-            '    <div class="panel panel-default">'
-            '       <div class="panel-heading"><h4>Circulating Coins</h4></div>'
-            '       <div class="panel-body">', format_satoshis(satoshis, chain), '</div>'
-            '    </div>'
-            '   </div>'
-
-            '  <div class="col-xs-4">'
-            '    <div class="panel panel-default">'
-            '       <div class="panel-heading"><h4>Total Coins Created</h4></div>'
-            '       <div class="panel-body">', format_satoshis(satoshis-totalcold, chain), '</div>'
-            '    </div>'
-            '   </div>'
-            '</div>']
-
+            body += ['</tr>\n']
         body += ['</table>\n']		
 	body += [
 		'<a style="font-size:80%">&nbsp; *Coins Circulating =  (total coins created) - (coins held in ',
