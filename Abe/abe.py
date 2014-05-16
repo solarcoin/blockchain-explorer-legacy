@@ -1069,6 +1069,7 @@ class Abe:
                 chain = chains[chain_id]
                 if chain_id != chain_ids[0]:
                     ret += [', ']
+                
                 ret += [format_satoshis(amounts[chain_id], chain),
                         ' ', escape(chain['code3'])]
                 if link:
@@ -1090,12 +1091,7 @@ class Abe:
                 link = address
         else:
             link = address[0 : abe.shortlink_type]
-        #body += abe.short_link(page, 'a/' + link)
-
-        #body += ['<p>Balance: '] + format_amounts(balance, True)
-
-        for chain_id in chain_ids:
-            balance[chain_id] = 0  # Reset for history traversal.
+       
         
         display_transactions = {}
         display_transactions['address'] = address
@@ -1103,10 +1099,13 @@ class Abe:
         display_transactions['transactions_out'] = count[1]
         display_transactions['received'] = format_amounts(received, False)
         display_transactions['sent'] = format_amounts(sent, False)
-        display_transactions['balance'] = format_amounts(balance, True)
+        display_transactions['balance'] = format_amounts(balance, False)
         
         display_transactions['transaction_list'] = []
 
+        for chain_id in chain_ids:
+            balance[chain_id] = 0  # Reset for history traversal.
+       
         for elt in txpoints:
             chain = chains[elt['chain_id']]
             balance[elt['chain_id']] += elt['value']

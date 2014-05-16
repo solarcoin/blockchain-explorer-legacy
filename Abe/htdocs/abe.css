@@ -13,3 +13,11 @@ table {
 .shortlink {
     font-size: smaller;
 }
+
+.search-box {
+    margin-bottom:30px;
+}
+
+.block-pager, .block-detail-pager {
+    margin-bottom:30px;
+}

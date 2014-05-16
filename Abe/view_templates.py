@@ -29,8 +29,7 @@ def get_default_homepage_template():
               <ul class="nav navbar-nav">
                 <li><a href="/">Home</a></li>
                 <li><a href="/browse_blocks/SolarCoin">Browse Blocks</a></li>
-                <li><a href="#about">About</a></li>
-                <li><a href="#contact">Contact</a></li>
+                <li><a href="http://www.solarcoin.org">SolarCoin Homepage</a></li>
               </ul>
             </div><!--/.nav-collapse -->
           </div>
@@ -58,15 +57,15 @@ def get_default_homepage_template():
 ######SEARCH FORM WIDGET
 def create_search_form():
     template ="""\
-            <div class=\"row\">
-              <div class=\"col-xs-8 col-xs-offset-2\">
+            <div class="row">
+              <div class="col-xs-8 col-xs-offset-2\">
                 <h2>Search by wallet address, block ID, or transaction ID:</h2>
               </div>
             </div>
-            <div class=\"row\">
-              <div class=\"col-xs-8 col-xs-offset-2\">
+            <div class="row search-box">
+              <div class="col-xs-8 col-xs-offset-2">
                   <form action="../search">
-                    <div class=\"input-group input-group-lg\">
+                    <div class="input-group input-group-lg">
                       <input name ="q" type=\"text\" class=\"form-control\" placeholder=\"Enter at least the first 6 characters\">
                       <span class=\"input-group-btn\">
                        <button class=\"btn btn-default\" type=\"submit\">Go!</button>
@@ -124,12 +123,16 @@ def generate_homepage(total_blocks, total_coins_created, cold_storage_wallets, s
 def generate_cold_storage_table(cold_storage_wallets):
   template = """\
   <div class="panel panel-default">
-    <div class="panel-heading">Cold Storage</div>
+    <div class="panel-heading cold-storage-heading" style="background-color: #F2B70A"><h4>Cold Storage</h4></div>
       <table class="table">
-        <tr><td>Wallet Address</td><td>Balance</td>
+        <tr><td><strong>Wallet Address</strong></td><td><strong>Balance</strong></td>
   """
   for wallet in cold_storage_wallets:
-      template += "<tr><td>%s</td><td>§%s</td></tr>" % (wallet, cold_storage_wallets[wallet])
+      if wallet == "Total":
+          address_link = wallet
+      else:
+          address_link = "<a href='../address/%s'>%s" % (wallet, wallet)
+      template += "<tr><td>%s</td><td>§%s</td></tr>" % (address_link, cold_storage_wallets[wallet])
   
   template += """\
         </table>
@@ -142,12 +145,12 @@ def generate_block_pager(basename, hi, count):
     #there's some corner cases that could use fixing, only an issue for coins with <count blocks
     first_link = '<a class="btn btn-lg btn-default" href="%s?hi=%s&count=%s">First</a>' % (basename, str(count), str(count))
     prev_link = '<a class="btn btn-lg btn-default" href="%s?hi=%s&count=%s">Previous</a>' % (basename, str(hi-count), str(count))
-    current_link = '<a class="btn btn-lg active btn-default" href="#">%s-%s</a>' % (str(hi-count), str(hi))
+    current_link = '<a class="btn btn-lg active btn-default" style="background-color: #F2B70A" href="#">%s-%s</a>' % (str(hi-count), str(hi))
     next_link = '<a class="btn btn-lg btn-default" href="%s?hi=%s&count=%s">Next</a>' % (basename, str(hi+count), str(count))
     latest_link = '<a class="btn btn-lg btn-default" href="%s?count=%s">Most Recent</a>' % (basename, str(count))
     
     pager = """\
-    <div class="row">
+    <div class="row block-pager">
       <div class="col-xs-6 col-xs-offset-3">
         <div class="btn-group">
           %s
@@ -169,7 +172,7 @@ def generate_browse_blocks_page(block_dict, block_pager):
       <div class="row">
         <div class="col-xs-12">
           <div class="panel panel-default">
-            <div class="panel-heading"><h4>All Blocks</h4></div>
+            <div class="panel-heading" style="background-color: #F2B70A"><h4>All Blocks</h4></div>
             <table class="table">
               <tr>
                 <td><h4>Block Number</h4></td>
@@ -197,13 +200,13 @@ def generate_block_detail_page(block_details, next_list, tx_ids, txs):
     
     #prev/next
     prev_link = '<a class="btn btn-lg btn-default" href="../block/%s">Previous</a>' % block_details['prev_block_hash']
-    current_link = '<a class="btn btn-lg active btn-default" href="#">Block # %s</a>' % block_details['block_number']
+    current_link = '<a class="btn btn-lg active btn-default" style="background-color: #F2B70A" href="#">Block # %s</a>' % block_details['block_number']
     next_link = ""
     for address in next_list:
         next_link += '<a class="btn btn-lg btn-default" href="%s">Next</a>' % address
     
     template = """\
-    <div class="row">
+    <div class="row block-detail-pager">
       <div class="col-xs-4 col-xs-offset-4">
         <div class="btn-group center-block">
           %s
@@ -218,7 +221,7 @@ def generate_block_detail_page(block_details, next_list, tx_ids, txs):
       <div class="row">
         <div class="col-xs-12">
           <div class="panel panel-default">
-            <div class="panel-heading"><h4>Block Information</h4></div>
+            <div class="panel-heading" style="background-color: #F2B70A"><h4>Block Information</h4></div>
             <table class="table">
               <tr><td><h4>Block Number</h4></td><td><h4>%s</h4></td></tr>
               <tr><td><h4>Creation Time</h4></td><td><h4>%s</h4></td></tr>
@@ -237,7 +240,7 @@ def generate_block_detail_page(block_details, next_list, tx_ids, txs):
       <div class="row">
         <div class="col-xs-12">
           <div class="panel panel-default">
-            <div class="panel-heading"><h4>Transactions</h4></div>
+            <div class="panel-heading" style="background-color: #F2B70A"><h4>Transactions</h4></div>
             <table class="table">
               <tr>
                 <td><h4>Transaction ID</h4></td>
@@ -282,7 +285,7 @@ def generate_block_detail_page(block_details, next_list, tx_ids, txs):
       <div class="row">
         <div class="col-xs-12">
           <div class="panel panel-default">
-            <div class="panel-heading"><h4>Block Details</h4></div>
+            <div class="panel-heading" style="background-color: #F2B70A"><h4>Block Details</h4></div>
             <table class="table">
               <tr><td><h4>Nonce</h4></td><td><h4>%s</h4></td></tr>
               <tr><td><h4>Merkle Root</h4></td><td><h4>%s</h4></td></tr>
@@ -337,7 +340,7 @@ def generate_transaction_detail_page(
       <div class="row">
         <div class="col-xs-12">
           <div class="panel panel-default">
-            <div class="panel-heading"><h4>Transaction Information</h4></div>
+            <div class="panel-heading" style="background-color: #F2B70A"><h4>Transaction Information</h4></div>
             <table class="table">
               <tr><td><h4>Transaction Hash</h4></td><td><h4>%s</h4></td></tr>
               <tr><td><h4>%s</h4></td><td><h4>%s</h4></td></tr>
@@ -363,7 +366,7 @@ def generate_transaction_detail_page(
       <div class="row">
         <div class="col-xs-12">
           <div class="panel panel-default">
-            <div class="panel-heading"><h4>Flows In</h4></div>
+            <div class="panel-heading" style="background-color: #F2B70A"><h4>Flows In</h4></div>
             <table class="table">
               <tr>
                 <td><h4>Incoming Transaction</h4></td>
@@ -389,7 +392,7 @@ def generate_transaction_detail_page(
       <div class="row">
         <div class="col-xs-12">
           <div class="panel panel-default">
-            <div class="panel-heading"><h4>Flows Out</h4></div>
+            <div class="panel-heading" style="background-color: #F2B70A"><h4>Flows Out</h4></div>
             <table class="table">
               <tr>
                 <td><h4>Outgoing Transaction</h4></td>
@@ -418,7 +421,7 @@ def generate_address_view(display_transactions):
     <div class="row">
         <div class="col-xs-12">
           <div class="panel panel-default">
-            <div class="panel-heading"><h4>Address %s</h4></div>
+            <div class="panel-heading" style="background-color: #F2B70A"><h4>Address %s</h4></div>
             <table class="table">
               <tr><td><h4>Transactions in</h4></td><td><h4>%s</h4></td></tr>
               <tr><td><h4>Transactions out</h4></td><td><h4>%s</h4></td></tr>
@@ -440,7 +443,7 @@ def generate_address_view(display_transactions):
       <div class="row">
         <div class="col-xs-12">
           <div class="panel panel-default">
-            <div class="panel-heading"><h4>Flows In</h4></div>
+            <div class="panel-heading" style="background-color: #F2B70A"><h4>Flows In</h4></div>
             <table class="table">
               <tr>
                 <td><h4>Transaction</h4></td>
@@ -482,21 +485,21 @@ def generate_summary_blocks_and_coins(total_blocks, total_coins_created, cold_st
     <div class="row">
       <div class="col-xs-4">
         <div class="panel panel-default">
-          <div class="panel-heading"><h4>Total Blocks</h4></div>
+          <div class="panel-heading homepage-summary-heading" style="background-color: #F2B70A"><h4>Total Blocks</h4></div>
           <div class="panel-body">{0}</div>
         </div>
       </div>
 
       <div class="col-xs-4">
         <div class="panel panel-default">
-          <div class="panel-heading"><h4>Circulating Coins</h4></div>
+          <div class="panel-heading homepage-summary-heading" style="background-color: #F2B70A"><h4>Circulating Coins</h4></div>
           <div class="panel-body">§{1}</div>
         </div>
       </div>
 
       <div class="col-xs-4">
         <div class="panel panel-default">
-          <div class="panel-heading"><h4>Total Coins Created</h4></div>
+          <div class="panel-heading homepage-summary-heading" style="background-color: #F2B70A"><h4>Total Coins Created</h4></div>
           <div class="panel-body">§{2}</div>
         </div>
       </div>
